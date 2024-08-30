@@ -1,5 +1,3 @@
-// This code takes the data from Client (ESP-32) via UDP and reconfig this data to JSON format and send to the app by demand via Websocket
-
 package main
 
 import (
@@ -28,9 +26,10 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// WebSocket connection
+// WebSocket соединение
 var wsConn *websocket.Conn
 
+// Функция для записи данных в файл
 func logData(data string) {
 	file, err := os.OpenFile(LOG_FILE, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -46,6 +45,7 @@ func logData(data string) {
 	}
 }
 
+// Функция для парсинга строки
 func parseString(inputStr string) []string {
 	inputStr = strings.TrimPrefix(inputStr, "#")
 	parts := strings.Split(inputStr, "=")
@@ -71,17 +71,44 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Client connected")
 
-	// loot for infinit handle connection 
 	for {
-		if _, _, err := wsConn.ReadMessage(); err != nil {
+		// Ожидание запроса от клиента
+		_, msg, err := wsConn.ReadMessage()
+		if err != nil {
 			log.Println("Error while reading message:", err)
 			return
+		}
+
+		log.Println("Received request from client:", string(msg))
+
+		// Ответ на запрос: отправка последнего полученного UDP сообщения
+		if dataStr != "" {
+			data := map[string]interface{}{
+				"timestamp": time.Now().Format(time.RFC3339),
+				"data":      dataStr,
+				"parsed":    parseString(dataStr),
+			}
+
+			jsonData, err := json.Marshal(data)
+			if err != nil {
+				log.Println("Error while marshalling JSON:", err)
+				continue
+			}
+
+			err = wsConn.WriteMessage(websocket.TextMessage, jsonData)
+			if err != nil {
+				log.Println("Error while writing message:", err)
+				wsConn = nil
+				return
+			}
 		}
 	}
 }
 
+var dataStr string // Переменная для хранения последнего UDP сообщения
+
 func main() {
-	// Inuit WebSocket-server
+	// Запуск WebSocket-сервера
 	http.HandleFunc("/ws", handleConnection)
 
 	serverAddr := "0.0.0.0:8080"
@@ -93,7 +120,7 @@ func main() {
 		}
 	}()
 
-	// Init UDP-server
+	// Запуск UDP-сервера
 	addr := net.UDPAddr{
 		Port: UDP_PORT,
 		IP:   net.ParseIP(UDP_IP),
@@ -117,39 +144,13 @@ func main() {
 			continue
 		}
 
-		dataStr := strings.TrimSpace(string(buffer[:n]))
+		// Обновляем переменную с последним сообщением
+		dataStr = strings.TrimSpace(string(buffer[:n]))
 
-		// Data logging
+		// Логирование данных
 		logData(dataStr)
 
-		parsedList := parseString(dataStr)
-
 		fmt.Printf("Received message from %s: %s\n", clientAddr, dataStr)
-		fmt.Printf("Parsed message: %v\n", parsedList)
-
-		for i := 1; i < len(parsedList); i++ {
-			fmt.Printf("Received message, item %d: %s\n", i, parsedList[i])
-		}
-
-		// Send data via WebSocket in JSON format
-		if wsConn != nil {
-			data := map[string]interface{}{
-				"timestamp": time.Now().Format(time.RFC3339),
-				"data":      dataStr,
-				"parsed":    parsedList,
-			}
-
-			jsonData, err := json.Marshal(data)
-			if err != nil {
-				log.Println("Error while marshalling JSON:", err)
-				continue
-			}
-
-			err = wsConn.WriteMessage(websocket.TextMessage, jsonData)
-			if err != nil {
-				log.Println("Error while writing message:", err)
-				wsConn = nil
-			}
-		}
+		fmt.Printf("Parsed message: %v\n", parseString(dataStr))
 	}
 }
