@@ -26,10 +26,9 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// WebSocket соединение
+// WebSocket connection
 var wsConn *websocket.Conn
 
-// Функция для записи данных в файл
 func logData(data string) {
 	file, err := os.OpenFile(LOG_FILE, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -45,7 +44,6 @@ func logData(data string) {
 	}
 }
 
-// Функция для парсинга строки
 func parseString(inputStr string) []string {
 	inputStr = strings.TrimPrefix(inputStr, "#")
 	parts := strings.Split(inputStr, "=")
@@ -105,10 +103,10 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var dataStr string // Переменная для хранения последнего UDP сообщения
+var dataStr string // variable for last UDP message
 
 func main() {
-	// Запуск WebSocket-сервера
+	// Init WebSocket-server
 	http.HandleFunc("/ws", handleConnection)
 
 	serverAddr := "0.0.0.0:8080"
@@ -120,7 +118,7 @@ func main() {
 		}
 	}()
 
-	// Запуск UDP-сервера
+	// Init UDP-server
 	addr := net.UDPAddr{
 		Port: UDP_PORT,
 		IP:   net.ParseIP(UDP_IP),
@@ -144,10 +142,9 @@ func main() {
 			continue
 		}
 
-		// Обновляем переменную с последним сообщением
+		// Update the variable with latest message
 		dataStr = strings.TrimSpace(string(buffer[:n]))
 
-		// Логирование данных
 		logData(dataStr)
 
 		fmt.Printf("Received message from %s: %s\n", clientAddr, dataStr)
