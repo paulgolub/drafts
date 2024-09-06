@@ -1,0 +1,20 @@
+FROM alpine:latest
+
+RUN apk add --no-cache go git
+
+WORKDIR /app
+
+COPY tokengen.go .
+
+RUN go mod init tokengen && \
+    go mod tidy && \
+    go get -u github.com/golang-jwt/jwt && \
+    go mod tidy
+
+RUN go build -o jwtGenerator ./jwtGenerator.go
+
+# Expose the port the app runs on
+EXPOSE 8088
+
+# Define the command to run the application
+CMD ["./jwtGenerator"]
