@@ -1,0 +1,69 @@
+package main
+
+import (
+	"encoding/json"
+	"net/http"
+	"time"
+
+	"github.com/golang-jwt/jwt"
+)
+
+const (
+	SECRET_KEY       = "your_secret_key"
+	TOKEN_EXPIRATION = 3600 // Token expiration time in seconds
+)
+
+// TokenResponse is the structure of the response
+type TokenResponse struct {
+	Token string `json:"token"`
+}
+
+// ErrorResponse is the structure for error responses
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// GenerateToken generates a JWT token
+func GenerateToken(w http.ResponseWriter, r *http.Request) {
+	// Parse the JSON request body
+	var requestData map[string]interface{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&requestData)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	username, ok := requestData["username"].(string)
+	if !ok || username == "" {
+		http.Error(w, `{"error": "Username is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Expiration time
+	expirationTime := time.Now().Add(time.Second * time.Duration(TOKEN_EXPIRATION)).Unix()
+
+	// Create the JWT claims
+	claims := &jwt.MapClaims{
+		"username": username,
+		"exp":      expirationTime,
+	}
+
+	// Create the token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(SECRET_KEY))
+	if err != nil {
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	// Send the token in the response
+	response := TokenResponse{Token: tokenString}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func main() {
+	http.HandleFunc("/token", GenerateToken)
+	http.ListenAndServe(":8088", nil)
+}
