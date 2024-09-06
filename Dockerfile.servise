@@ -1,0 +1,18 @@
+FROM alpine:latest
+
+RUN apk add --no-cache go git
+
+WORKDIR /app
+
+COPY appservise.go .
+
+RUN go mod init appservise \
+    && go get github.com/gorilla/websocket \
+    && go get github.com/golang-jwt/jwt
+
+RUN go build -o appservise
+
+EXPOSE 8085/udp
+EXPOSE 8765
+
+CMD ["./appservise"]
