@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  hello_world:
+    build:
+      context: .
+      dockerfile: Dockerfile.servise
+    ports:
+      - "8085:8085/udp"
+      - "8765:8765"
+    restart: always
+
+  tokengen:
+    build:
+      context: .
+      dockerfile: Dockerfile.jwt
+    ports:
+      - "8088:8088"
+    restart: always
