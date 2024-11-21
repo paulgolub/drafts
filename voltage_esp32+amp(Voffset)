@@ -1,0 +1,78 @@
+#include <Arduino.h>
+#include <esp_adc_cal.h>
+
+// ADC settings
+#define DEFAULT_VREF 1100 // Specify reference voltage (mV) if eFuse is absent
+#define NO_OF_SAMPLES 64  // Number of samples for averaging
+
+esp_adc_cal_characteristics_t *adc_chars;
+adc1_channel_t channel1 = ADC1_CHANNEL_0; // GPIO1
+adc1_channel_t channel3 = ADC1_CHANNEL_2; // GPIO3
+
+void setup() {
+  Serial.begin(115200);
+
+  // Configure ADC for GPIO1 and GPIO3
+  adc1_config_width(ADC_WIDTH_BIT_12); // Set ADC width (12 bits)
+  adc1_config_channel_atten(channel1, ADC_ATTEN_DB_11);  // Set attenuation for GPIO1
+  adc1_config_channel_atten(channel3, ADC_ATTEN_DB_11); // Set attenuation for GPIO3
+
+  // Allocate memory for calibration characteristics
+  adc_chars = (esp_adc_cal_characteristics_t *)calloc(1, sizeof(esp_adc_cal_characteristics_t));
+  esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, DEFAULT_VREF, adc_chars);
+
+  // Check if calibration values were obtained from eFuse
+  if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
+    Serial.println("Calibration values obtained from eFuse Vref.");
+  } else if (val_type == ESP_ADC_CAL_VAL_EFUSE_TP) {
+    Serial.println("Calibration values obtained from eFuse Two Point.");
+  } else {
+    Serial.println("Calibration values: Default value used.");
+  }
+}
+
+uint32_t read_adc_voltage(adc1_channel_t channel) {
+  uint32_t adc_reading = 0;
+  // Average the readings
+  for (int i = 0; i < NO_OF_SAMPLES; i++) {
+    adc_reading += adc1_get_raw(channel);
+  }
+  adc_reading /= NO_OF_SAMPLES;
+
+  // Convert to voltage using calibration
+  uint32_t voltage = esp_adc_cal_raw_to_voltage(adc_reading, adc_chars);
+  return voltage;
+}
+
+void loop() {
+  // Read voltages from GPIO1 and GPIO3
+  int32_t voltage1 = read_adc_voltage(channel1);
+  int32_t voltage3 = read_adc_voltage(channel3);
+
+  // Calculate voltage difference
+  float delta_voltage = voltage3 - voltage1;
+
+  int32_t voltage_r = (static_cast<int32_t>(voltage3) - static_cast<int32_t>(voltage1) * 10 / 12);
+
+  // Output values to the monitor
+  Serial.println(" ------------------------ ");
+  Serial.print("GPIO1 Voltage: ");
+  Serial.print(voltage1);
+  Serial.println(" mV");
+
+  Serial.print("GPIO3 Voltage: ");
+  Serial.print(voltage3);
+  Serial.println(" mV");
+
+  Serial.println(" ------------------------ ");
+  Serial.print("Delta Voltage: ");
+  Serial.print(static_cast<int32_t>(voltage3 - voltage1));
+  Serial.println(" mV");
+
+  Serial.println(" ------------------------ ");
+  Serial.print("!!! --- Voltage: ");
+  Serial.print(voltage_r);
+  Serial.println(" mV");
+
+  delay(1000); // Delay 1 second
+}
