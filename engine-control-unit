@@ -1,0 +1,7 @@
+## addresses
+## engine control unit
+
+BOOTLOADER - 0x0000
+EEPROM - 0x4000
+Calibration - 0x8000
+PROGRAM - 0x10000
